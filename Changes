@@ -1,0 +1,6 @@
+Revision history for Perl extension IRR.
+
+0.01  Mon Sep 22 09:02:33 2003
+  - Renamed from IRR to Net::IRR 
+  - Added more tests
+
