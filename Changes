@@ -1,6 +1,12 @@
 Revision history for Perl extension Net::IRR.
 
-0.04
+0.05 Tue Aug 10 08:07:10 2004
+  - seperated $whois->get_route_search() from $whois->get_as_search()
+  - cleaned up warnings
+  - refactored $whois->route_search() internals
+  - fixed a croak() typo in $whois->update()
+
+0.04 Mon Aug 9 08:07:10 2004
   - added $whois->get_route_set() (suggested by Peter Mills)
   - fixed a usage message in $whois->get_as_set()
 

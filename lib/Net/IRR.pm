@@ -1,5 +1,5 @@
 package Net::IRR;
-# $Id: IRR.pm,v 1.9 2004/08/09 16:38:54 tcaine Exp $ 
+# $Id: IRR.pm,v 1.10 2004/08/10 15:14:00 tcaine Exp $ 
 
 use strict;
 use warnings;
@@ -9,7 +9,7 @@ use Net::TCP;
 
 use vars qw/ @ISA %EXPORT_TAGS @EXPORT_OK $VERSION /;
 
-$VERSION = '0.04';
+$VERSION = '0.05';
 
 #  used for route searches
 use constant EXACT_MATCH   => 'o';
@@ -43,7 +43,7 @@ sub connect {
 
 sub get_routes_by_origin {
     my ($self, $as) = @_;
-    croak("usage: \$whois->get_routes_by_community( \$as_number )") unless @_ == 2;
+    croak 'usage: $whois->get_routes_by_origin( $as_number )' unless @_ == 2;
     $as = 'as'.$as unless $as =~ /^as/i;
     $self->{tcp}->send("!g${as}\n");
     if (my $data = $self->_response()) {
@@ -55,7 +55,7 @@ sub get_routes_by_origin {
 # RIPE-181 Only
 sub get_routes_by_community {
     my ($self, $community) = @_;
-    croak("usage: \$whois->get_routes_by_community( \$community )") unless @_ == 2;
+    croak 'usage: $whois->get_routes_by_community( $community )' unless @_ == 2;
     $self->{tcp}->send("!h${community}\n");
     if (my $data = $self->_response()) {
         return (wantarray) ? split(" ", $data) : $data;
@@ -70,10 +70,9 @@ sub get_sync_info {
     return $self->_response();
 }
 
-*get_route_set = \&get_as_set;
 sub get_as_set {
     my ($self, $as_set, $expand) = @_;
-    croak("usage: \$whois->get_as_set( \$as_set )") unless @_ >= 2 && @_ <= 3;
+    croak 'usage: $whois->get_as_set( $as_set )' unless @_ >= 2 && @_ <= 3;
     $expand = ($expand) ? ',1' : '';
     $self->{tcp}->send("!i${as_set}${expand}\n");
     if (my $data = $self->_response()) {
@@ -82,9 +81,19 @@ sub get_as_set {
     return ();
 }
 
+sub get_route_set {    my ($self, $route_set, $expand) = @_;
+    croak 'usage: $whois->get_route_set( $route_set )' unless @_ >= 2 && @_ <= 3;
+    $expand = ($expand) ? ',1' : '';
+    $self->{tcp}->send("!i${route_set}${expand}\n");
+    if (my $data = $self->_response()) {
+        return (wantarray) ? split(" ", $data) : $data;
+    }
+    return ();
+}
+
 sub match {
     my ($self, $type, $key) = @_;
-    croak("usage: \$whois->match( \$object_type, \$key )") unless @_ == 3;
+    croak 'usage: $whois->match( $object_type, $key )' unless @_ == 3;
     $self->{tcp}->send("!m${type},${key}\n");
     return $self->_response();
 }
@@ -115,10 +124,9 @@ sub get_irrd_version {
 
 sub route_search {
     my ($self, $route, $specific) = @_;
-    croak("usage: \$whois->route_search( \$route )") unless @_ >= 2 && @_ <= 3;
-    my $cmd = "!r${route}";
-    $cmd .= ",${specific}" if $specific;
-    $self->{tcp}->send("$cmd\n");
+    croak 'usage: $whois->route_search( $route )' unless @_ >= 2 && @_ <= 3;
+    $specific = ($specific) ? ",$specific" : '';
+    $self->{tcp}->send("!r${route}${specific}\n");
     my $response = $self->_response();
     chomp($response) if $response;
     $response =~ s/\s*$// if $response;
@@ -134,10 +142,10 @@ sub sources {
 
 sub update {
     my ($self, $db, $action, $object) = @_;
-    croak("usage: \$whois->update( \$db, \"ADD|DEL\", \$object )") unless @_ == 4;
-    croad("second argument to \$whois->update() must be either ADD or DEL\n")
+    croak 'usage: $whois->update( $db, "ADD|DEL", $object )' unless @_ == 4;
+    croak 'second argument to $whois->update() must be either ADD or DEL'
         unless $action eq 'ADD' || $action eq 'DEL';
-    $self->{tcp}->send("!us${db}\n${action}\n\n${object}\n\n!ue\n");
+    $self->{tcp}->send( sprintf("!us%s\n%s\n\n%s\n\n!ue\n", $db, $action, $object) );
     return $self->_response();
 }
 
@@ -145,8 +153,9 @@ sub _response {
     my $self = shift;
     my $t = $self->{tcp};
     my $header = $t->getline();
+    my $error_prefix = 'Net::IRR read error';
     if (not defined $header) {
-        $self->{errstr} = sprintf("no data read from server %s:%d\n", $self->{host}, $self->{port});
+        $self->{errstr} = sprintf("%s: no data read from %s:%d\n", $error_prefix, $self->{host}, $self->{port});
         return ();
     }
     return () if ($header =~ /^[CDEF].*$/);
@@ -155,7 +164,7 @@ sub _response {
     while($data_length != length($data)) {
         $data .= $t->getline();
     }
-    warn "only got " . length($data) . " out of $data_length bytes\n" 
+    warn sprintf("%s: only received %d out of %d bytes from %s:%d\n", $error_prefix, length($data), $data_length, $self->{host}, $self->{port})
         if $data_length != length($data);
     my $footer = $t->getline();
     return $data;
@@ -182,7 +191,7 @@ Net::IRR - Perl interface to the Internet Route Registry Daemon
   my $host = 'whois.radb.net';
 
   my $i = Net::IRR->connect( host => $host ) 
-      or croak "can't connect to $host\n";
+      or die "can't connect to $host\n";
 
   my $version = $i->get_irrd_version();
   print "IRRd Version: $version\n" unless $i->error();
@@ -192,8 +201,7 @@ Net::IRR - Perl interface to the Internet Route Registry Daemon
   print "found $#routes routes\n";
 
   print "AS-SET for AS5650\n";
-  my $expand = '1'; # 1 = AS-SET expansion; 0 = no AS-SET expansion
-  if (my @ases = $i->get_as_set("AS-ELI", $expand)) {
+  if (my @ases = $i->get_as_set("AS-ELI", 1)) {
       print "found $#ases AS's\n";
       print "@ases\n";
   }
@@ -202,12 +210,11 @@ Net::IRR - Perl interface to the Internet Route Registry Daemon
   }
 
   my $aut-num = $i->match("aut-num","as5650");
-      or warn("Can't find object: " . $i->error . "\n");
+      or warn("can't find object: " . $i->error . "\n");
 
   print $i->route_search("208.186.0.0/15", Net::IRR::EXACT_MATCH) 
       . " originates 208.186.0.0/15\n";
 
-  print "Syncronization Information\n";
   print $i->get_sync_info(), "\n";
 
   $i->disconnect();
