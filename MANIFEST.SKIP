@@ -3,13 +3,10 @@ CVS/.*
 \.tar$
 \.tgz$
 \.tar\.gz$
-^tmp/
 ^blib/
 ^Makefile$
 ^Makefile\.[a-z]+$
 ^pm_to_blib$
 ~$
-^#
-login.txt
-tmp.txt
-logs
+^_build
+^Build$

@@ -1,10 +1,11 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Net-IRR
-version:      0.01
+version:      0.02
 version_from: lib/Net/IRR.pm
 installdirs:  site
 requires:
+    Carp:                          0
     Net::TCP:                      0
     Test::More:                    0
 

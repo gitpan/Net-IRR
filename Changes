@@ -1,5 +1,10 @@
 Revision history for Perl extension IRR.
 
+0.02  Thu Jun 24 09:13:47 2004
+  - Updated documentation
+  - Fixed required parameter checking
+  - Now using croak() instead of die()
+
 0.01  Mon Sep 22 09:02:33 2003
   - Renamed from IRR to Net::IRR 
   - Added more tests

@@ -3,11 +3,12 @@ package Net::IRR;
 use strict;
 use warnings;
 
+use Carp;
 use Net::TCP;
 
-use vars qw/ @ISA %EXPORT_TAGS @EXPORT_OK @EXPORT $VERSION /;
+use vars qw/ @ISA %EXPORT_TAGS @EXPORT_OK $VERSION /;
 
-$VERSION = '0.01';
+$VERSION = '0.02';
 
 #  used for route searches
 use constant EXACT_MATCH   => 'o';
@@ -17,12 +18,11 @@ use constant MORE_SPECIFIC => 'M';
 
 require Exporter;
 @ISA = qw(Exporter);
+@EXPORT_OK   = qw( EXACT_MATCH ONE_LEVEL LESS_SPECIFIC MORE_SPECIFIC );
 %EXPORT_TAGS = ( 
-    'all'   => [ qw( EXACT_MATCH ONE_LEVEL LESS_SPECIFIC MORE_SPECIFIC ) ],
-    'route' => [ qw( EXACT_MATCH ONE_LEVEL LESS_SPECIFIC MORE_SPECIFIC ) ],
+    'all'   => \@EXPORT_OK,
+    'route' => \@EXPORT_OK,
 );
-@EXPORT_OK   = ( @{ $EXPORT_TAGS{'all'} } );
-@EXPORT      = qw();
 
 #  constructor
 sub connect {
@@ -43,7 +43,7 @@ sub connect {
 
 sub get_routes_by_origin {
     my ($self, $as) = @_;
-    die(__PACKAGE__."::get_routes_by_community() requires 1 argument\n") unless @_ == 2;
+    croak("usage: \$whois->get_routes_by_community( \$as_number )") unless @_ == 2;
     $as = 'as'.$as unless $as =~ /^as/i;
     $self->{tcp}->send("!g${as}\n");
     if (my $data = $self->_response()) {
@@ -55,7 +55,7 @@ sub get_routes_by_origin {
 # RIPE-181 Only
 sub get_routes_by_community {
     my ($self, $community) = @_;
-    die(__PACKAGE__."::get_routes_by_community() requires 1 argument\n") unless @_ == 2;
+    croak("usage: \$whois->get_routes_by_community( \$community )") unless @_ == 2;
     $self->{tcp}->send("!h${community}\n");
     if (my $data = $self->_response()) {
         return (wantarray) ? split(" ", $data) : $data;
@@ -72,7 +72,7 @@ sub get_sync_info {
 
 sub get_as_set {
     my ($self, $as_set, $expand) = @_;
-    die(__PACKAGE__."::get_as_set() requires 1 argument\n") unless @_ == 2;
+    croak("usage: $\whois->get_as_set( \$as_set )") unless @_ >= 2 && @_ <= 3;
     $expand = ($expand) ? ',1' : '';
     $self->{tcp}->send("!i${as_set}${expand}\n");
     if (my $data = $self->_response()) {
@@ -83,7 +83,7 @@ sub get_as_set {
 
 sub match {
     my ($self, $type, $key) = @_;
-    die(__PACKAGE__."::match() requires 2 arguments\n") unless @_ == 3;
+    croak("usage: \$whois->match( \$object_type, \$key )") unless @_ == 3;
     $self->{tcp}->send("!m${type},${key}\n");
     return $self->_response();
 }
@@ -114,7 +114,7 @@ sub get_irrd_version {
 
 sub route_search {
     my ($self, $route, $specific) = @_;
-    die(__PACKAGE__."::route_search() requires 1 argument\n") unless @_ > 1;
+    croak("usage: \$whois->route_search( \$route )") unless @_ >= 2 && @_ <= 3;
     my $cmd = "!r${route}";
     $cmd .= ",${specific}" if $specific;
     $self->{tcp}->send("$cmd\n");
@@ -134,8 +134,8 @@ sub sources {
 
 sub update {
     my ($self, $db, $action, $object) = @_;
-    die(__PACKAGE__."::update() requires 3 arguments\n") unless @_ == 4;
-    die("second argument to ".__PACKAGE__."::update() must be either ADD or DEL\n")
+    croak("usage: \$whois->update( \$db, \"ADD|DEL\", \$object )") unless @_ == 4;
+    croad("second argument to \$whois->update() must be either ADD or DEL\n")
         unless $action eq 'ADD' || $action eq 'DEL';
     $self->{tcp}->send("!us${db}\n${action}\n\n${object}\n\n!ue\n");
     return $self->_response();
@@ -178,7 +178,7 @@ Net::IRR - Perl interface to the Internet Route Registry Daemon
   my $host = 'whois.radb.net';
 
   my $i = Net::IRR->connect( host => $host ) 
-      or die "can't connect to $host\n";
+      or croak "can't connect to $host";
 
   print "IRRd Version: " . $i->get_irrd_version() . "\n";
 
@@ -214,75 +214,59 @@ This module provides an object oriented perl interface to the Internet Route Reg
 
 =over 4
 
-=item B<connect> - connect to a Route Registry server
+=item Net::IRR->connect( host => $hostname, port => $port_number )
 
-    my $o = Net::IRR->connect(host=>$host, port=>$port)
-        or die "can't connect to $host\n";
+This class method is used to connect to a route registry server.  Net::IRR->connect() is also the constructor for the Net::IRR class.  The constructor returns a Net::IRR object upon connection to the IRR server or undef upon failure.
 
-This is the constructor used to create Net::IRR objects.  The constructor returns an Net::IRR object upon a successful connection to the IRR server and undef upon failure.
+=item $whois->disconnect()
 
-=item B<disconnect> - closes the connection to the Route Registry server
+This method closes the connection to the route registry server.
 
-    $o->disconnect;
+=item $whois->quit()
 
-=item B<quit> - same as disconnect().
- 
-    $o->quit;
+Same as $whois->disconnect().
 
-=item B<get_routes_by_origin> - get routes with a specified origin AS
+=item $whois->get_routes_by_origin('AS5650')
 
-    my @routes = $o->get_routes_by_origin('AS5650');
+Get routes with a specified origin AS.  This method takes an autonomous system number and returns the set of routes it originates.  Upon success this method returns a list of routes in list context or a string of space seperated routes.  undef is returned upon failure.
 
-This method takes an autonomous system number and returns the set of routes it originates.  Upon success this method returns a list of routes in list context or a string of space seperated routes.  undef is returned upon failure.
-
-=item B<get_routes_by_community> - get routes with a specified community
+=item $whois->get_routes_by_community($community_name)
 
 This method is for RIPE-181 only.  It is not supported by RPSL.  This method takes a community object name  and returns the set of routes it originates.  Upon success this method returns a list of routes in list context or a string of space seperated routes.  undef is returned upon failure.
 
-=item B<get_sync_info> - view the mirror status of a database
-
-    print $o->get_sync_info;
+=item $whois->get_sync_info()
 
 This method provides database syncronization information.  This makes it possible to view the mirror status of a database.  This method optionally takes the name of a database such as RADB or ELI.  If no argument is given the method will return information about all databases originating from and mirrored by the registry server.  If the optional argument is given the database specified will be checked and it's status returned.  This method returns undef if no database exists or if access is denied.
 
-=item B<get_as_set> - get ASNs for a registered AS-SET object
+=item $whois->get_as_set("AS-ELI", 1)
 
-    my @as = $o->get_as_set("AS-ELI", 1);
+This method takes an AS-SET object name and returns the ASNs registered for the AS-SET object.  The method takes and optional second argument which enables AS-SET key expasion since an AS-SET can contain both ASNs and AS-SET keys.  undef is returned upon failure.
 
-This method takes an AS-SET object name and returns the ASNs found.  The method takes and optional second argument which enables AS-SET key expasion since an AS-SET can contain both ASNs and AS-SET keys.  undef is returned upon failure.
+=item $whois->match('aut-num', 'AS5650'); - get RPSL objects registered in the database
 
-=item B<match> - get RPSL objects registered in the database
+The example above will retrieve the aut-num object with the key AS5650.  This method will return the first RPSL object matching the object type and name specified as parameters to $whois->match().  undef is returned upon failure.
 
-    print $o->match('aut-num', 'as5650');
-
-The example above will retrieve the aut-num object with the key as5650.  This method will return after the first match.  undef is returned upon failure.
-
-=item B<get_irrd_version> - get the IRRd version number
-
-    print $o->get_irrd_version;
+=item $whois->get_irrd_version()
 
 This methods takes no arguments and returns the version of the IRRd server that was specified as the hostname to the connect() method.
 
-=item B<route_search> - perform route searches
+=item $whois->route_search("208.186.0.0/15", EXACT_MATCH)
 
-    $o->route_search("208.186.0.0/15", EXACT_MATCH);
-
-This method takes two arguments, a route and an optional flag.  The flag can be one of four values: EXACT_MATCH, LEVEL_ONE, LESS_SPECIFIC, MORE_SPECIFIC.  These constants can be imported into your namespace by using the :all or :route export tag when importing the Net::IRR module.
+The method is used to search for route objects.  The method takes two arguments, a route and an optional flag.  The flag can be one of four values: EXACT_MATCH, LEVEL_ONE, LESS_SPECIFIC, MORE_SPECIFIC.  These constants can be imported into your namespace by using the :all or :route export tag when importing the Net::IRR module.
 
     use Net::IRR qw( :route );
 
     print "EXACT_MATCH = " . EXACT_MATCH . "\n";
 
-=item B<sources> - get or set the databases and the database search order used for queries.
+=item $whois->sources()
 
-The default database is all and the default search order is the order they where defined in IRRd's configuration file.  The sources() method accepts a list databases in the order you would like them searched in future queries.  If no arguments are given the method will return a list of all the databases in the RR.
+This method is used to both get and set the databases used for Internet Route Registry queries.  The $whois->sources() method accepts a list of databases in the order they should be searched.  If no arguments are given the method will return a list of all the databases mirrored by the route registry you are connected to.
 
-=item B<update> - add or delete a database object in the remote database
+=item $whois->update($database, 'ADD', $rpsl_rr_object)
 
-This method takes three arguments.   The first argument is the database to update.  The second arguemnt is the action which can be either "ADD" or "DEL".  The third and final required arguement is a route object in RPSL format.
+This method is used to add or delete a database object.  This method takes three arguments.   The first argument is the database to update.  The second arguemnt is the action which can be either "ADD" or "DEL".  The third and final required arguement is a route object in RPSL format.
 
-=item B<error> - access error messages
-    warn $o->error, "\n" if $o->error;
+=item $whois->error()
 
 Most Net::IRR methods set an error message when errors occur.  These errors can only be accessed by using the error() method.
 
@@ -304,7 +288,7 @@ http://www.irrd.net/irrd-user.pdf, Appendix B
 
 =head1 COPYRIGHT
 
-Copyright 2002 by Todd Caine.  All rights reserved.  This program is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
+Copyright 2002, 2003, 2004 by Todd Caine.  All rights reserved.  This program is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
 
 
 =cut

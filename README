@@ -52,38 +52,33 @@ DESCRIPTION
     http://www.ripe.net/.
 
 METHODS
-    connect - connect to a Route Registry server
-            my $o = Net::IRR->connect(host=>$host, port=>$port)
-                or die "can't connect to $host\n";
+    Net::IRR->connect( host => $hostname, port => $port_number )
+        This class method is used to connect to a route registry server.
+        Net::IRR->connect() is also the constructor for the Net::IRR class.
+        The constructor returns a Net::IRR object upon connection to the IRR
+        server or undef upon failure.
 
-        This is the constructor used to create Net::IRR objects. The
-        constructor returns an Net::IRR object upon a successful connection
-        to the IRR server and undef upon failure.
+    $whois->disconnect()
+        This method closes the connection to the route registry server.
 
-    disconnect - closes the connection to the Route Registry server
-            $o->disconnect;
+    $whois->quit()
+        Same as $whois->disconnect().
 
-    quit - same as disconnect().
-            $o->quit;
+    $whois->get_routes_by_origin('AS5650')
+        Get routes with a specified origin AS. This method takes an
+        autonomous system number and returns the set of routes it
+        originates. Upon success this method returns a list of routes in
+        list context or a string of space seperated routes. undef is
+        returned upon failure.
 
-    get_routes_by_origin - get routes with a specified origin AS
-            my @routes = $o->get_routes_by_origin('AS5650');
-
-        This method takes an autonomous system number and returns the set of
-        routes it originates. Upon success this method returns a list of
-        routes in list context or a string of space seperated routes. undef
-        is returned upon failure.
-
-    get_routes_by_community - get routes with a specified community
+    $whois->get_routes_by_community($community_name)
         This method is for RIPE-181 only. It is not supported by RPSL. This
         method takes a community object name and returns the set of routes
         it originates. Upon success this method returns a list of routes in
         list context or a string of space seperated routes. undef is
         returned upon failure.
 
-    get_sync_info - view the mirror status of a database
-            print $o->get_sync_info;
-
+    $whois->get_sync_info()
         This method provides database syncronization information. This makes
         it possible to view the mirror status of a database. This method
         optionally takes the name of a database such as RADB or ELI. If no
@@ -93,55 +88,50 @@ METHODS
         checked and it's status returned. This method returns undef if no
         database exists or if access is denied.
 
-    get_as_set - get ASNs for a registered AS-SET object
-            my @as = $o->get_as_set("AS-ELI", 1);
+    $whois->get_as_set("AS-ELI", 1)
+        This method takes an AS-SET object name and returns the ASNs
+        registered for the AS-SET object. The method takes and optional
+        second argument which enables AS-SET key expasion since an AS-SET
+        can contain both ASNs and AS-SET keys. undef is returned upon
+        failure.
 
-        This method takes an AS-SET object name and returns the ASNs found.
-        The method takes and optional second argument which enables AS-SET
-        key expasion since an AS-SET can contain both ASNs and AS-SET keys.
+    $whois->match('aut-num', 'AS5650'); - get RPSL objects registered in the
+    database
+        The example above will retrieve the aut-num object with the key
+        AS5650. This method will return the first RPSL object matching the
+        object type and name specified as parameters to $whois->match().
         undef is returned upon failure.
 
-    match - get RPSL objects registered in the database
-            print $o->match('aut-num', 'as5650');
-
-        The example above will retrieve the aut-num object with the key
-        as5650. This method will return after the first match. undef is
-        returned upon failure.
-
-    get_irrd_version - get the IRRd version number
-            print $o->get_irrd_version;
-
+    $whois->get_irrd_version()
         This methods takes no arguments and returns the version of the IRRd
         server that was specified as the hostname to the connect() method.
 
-    route_search - perform route searches
-            $o->route_search("208.186.0.0/15", EXACT_MATCH);
-
-        This method takes two arguments, a route and an optional flag. The
-        flag can be one of four values: EXACT_MATCH, LEVEL_ONE,
-        LESS_SPECIFIC, MORE_SPECIFIC. These constants can be imported into
-        your namespace by using the :all or :route export tag when importing
-        the Net::IRR module.
+    $whois->route_search("208.186.0.0/15", EXACT_MATCH)
+        The method is used to search for route objects. The method takes two
+        arguments, a route and an optional flag. The flag can be one of four
+        values: EXACT_MATCH, LEVEL_ONE, LESS_SPECIFIC, MORE_SPECIFIC. These
+        constants can be imported into your namespace by using the :all or
+        :route export tag when importing the Net::IRR module.
 
             use Net::IRR qw( :route );
 
             print "EXACT_MATCH = " . EXACT_MATCH . "\n";
 
-    sources - get or set the databases and the database search order used
-    for queries.
-        The default database is all and the default search order is the
-        order they where defined in IRRd's configuration file. The sources()
-        method accepts a list databases in the order you would like them
-        searched in future queries. If no arguments are given the method
-        will return a list of all the databases in the RR.
+    $whois->sources()
+        This method is used to both get and set the databases used for
+        Internet Route Registry queries. The $whois->sources() method
+        accepts a list of databases in the order they should be searched. If
+        no arguments are given the method will return a list of all the
+        databases mirrored by the route registry you are connected to.
 
-    update - add or delete a database object in the remote database
-        This method takes three arguments. The first argument is the
-        database to update. The second arguemnt is the action which can be
-        either "ADD" or "DEL". The third and final required arguement is a
-        route object in RPSL format.
+    $whois->update($database, 'ADD', $rpsl_rr_object)
+        This method is used to add or delete a database object. This method
+        takes three arguments. The first argument is the database to update.
+        The second arguemnt is the action which can be either "ADD" or
+        "DEL". The third and final required arguement is a route object in
+        RPSL format.
 
-    error - access error messages warn $o->error, "\n" if $o->error;
+    $whois->error()
         Most Net::IRR methods set an error message when errors occur. These
         errors can only be accessed by using the error() method.
 
@@ -158,7 +148,7 @@ SEE ALSO
     http://www.irrd.net/irrd-user.pdf, Appendix B
 
 COPYRIGHT
-    Copyright 2002 by Todd Caine. All rights reserved. This program is free
-    software; you can redistribute it and/or modify it under the same terms
-    as Perl itself.
+    Copyright 2002, 2003, 2004 by Todd Caine. All rights reserved. This
+    program is free software; you can redistribute it and/or modify it under
+    the same terms as Perl itself.
 
