@@ -3,6 +3,5 @@ lib/Net/IRR.pm
 Makefile.PL
 MANIFEST
 MANIFEST.SKIP
-README
 t/01_methods.t
 META.yml                                Module meta-data (added by MakeMaker)

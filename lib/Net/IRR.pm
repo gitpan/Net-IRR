@@ -8,7 +8,7 @@ use Net::TCP;
 
 use vars qw/ @ISA %EXPORT_TAGS @EXPORT_OK $VERSION /;
 
-$VERSION = '0.02';
+$VERSION = '0.03';
 
 #  used for route searches
 use constant EXACT_MATCH   => 'o';
@@ -30,12 +30,11 @@ sub connect {
     my $self = bless {}, ref($class) || $class;
     $self->{host} = $args{host} || '127.0.0.1';
     $self->{port} = $args{port} || 43;
-    my $error;
     eval {
-        local $SIG{__WARN__} = sub { $error = shift };
+        local $SIG{__WARN__} = sub { $self->{errstr} = shift };
         $self->{tcp} = Net::TCP->new($self->{host}, $self->{port});
     };
-    return undef if $error;
+    return undef if $self->error();
     $self->_multi_mode();
     $self->_identify();
     return $self; 
@@ -96,7 +95,7 @@ sub quit {
 
 sub _identify {
     my ($self) = @_;
-    $self->{tcp}->send("!nIRR.pm\n");
+    $self->{tcp}->send("!nNet::IRR\n");
     return $self->_response();
 }
 
@@ -119,9 +118,8 @@ sub route_search {
     $cmd .= ",${specific}" if $specific;
     $self->{tcp}->send("$cmd\n");
     my $response = $self->_response();
-    # clean the output up a little
-    chomp($response);
-    $response =~ s/\s*$//;
+    chomp($response) if $response;
+    $response =~ s/\s*$// if $response;
     return $response;
 }
 
@@ -145,6 +143,10 @@ sub _response {
     my $self = shift;
     my $t = $self->{tcp};
     my $header = $t->getline();
+    if (not defined $header) {
+        $self->{errstr} = sprintf("no data read from server %s:%d\n", $self->{host}, $self->{port});
+        return ();
+    }
     return () if ($header =~ /^[CDEF].*$/);
     my($data_length) = $header =~ /^A(.*)$/;
     my $data = '';
@@ -173,21 +175,23 @@ Net::IRR - Perl interface to the Internet Route Registry Daemon
 
 =head1 SYNOPSIS
 
-  use Net::IRR qw/ :route /;
+  use Net::IRR;
 
   my $host = 'whois.radb.net';
 
   my $i = Net::IRR->connect( host => $host ) 
-      or croak "can't connect to $host";
+      or croak "can't connect to $host\n";
 
-  print "IRRd Version: " . $i->get_irrd_version() . "\n";
+  my $version = $i->get_irrd_version();
+  print "IRRd Version: $version\n" unless $i->error();
 
   print "Routes by Origin AS5650\n";
   my @routes = $i->get_routes_by_origin("AS5650");
   print "found $#routes routes\n";
 
   print "AS-SET for AS5650\n";
-  if (my @ases = $i->get_as_set("AS-ELI")) {
+  my $expand = '1'; # 1 = AS-SET expansion; 0 = no AS-SET expansion
+  if (my @ases = $i->get_as_set("AS-ELI", $expand)) {
       print "found $#ases AS's\n";
       print "@ases\n";
   }
@@ -198,7 +202,7 @@ Net::IRR - Perl interface to the Internet Route Registry Daemon
   my $aut-num = $i->match("aut-num","as5650");
       or warn("Can't find object: " . $i->error . "\n");
 
-  print $i->route_search("208.186.0.0/15", EXACT_MATCH) 
+  print $i->route_search("208.186.0.0/15", Net::IRR::EXACT_MATCH) 
       . " originates 208.186.0.0/15\n";
 
   print "Syncronization Information\n";
@@ -208,7 +212,11 @@ Net::IRR - Perl interface to the Internet Route Registry Daemon
 
 =head1 DESCRIPTION
 
-This module provides an object oriented perl interface to the Internet Route Registry.  The interface uses the RIPE/RPSL Tool Query Language as defined in Appendix B of the IRRd User Guide.  The guide can be found at http://www.irrd.net/, however an understanding of the query language is not required to use this module.  Net::IRR supports IRRd's multiple-command mode.  Multiple-command mode is good for intensive queries since only one TCP connection needs to be made for multiple queries.  The interface also allows for additional queries that aren't supported by standard UNIX I<whois> utitilies.  Hopefully this module will stimulate development of new Route Registry tools written in Perl.  An example of Route Registry tools can be found by googling for RAToolset which is now known as the IRRToolset.  The RAToolset was originally developed by ISI, http://www.isi.edu/, and is now maintained by RIPE, http://www.ripe.net/.
+This module provides an object oriented perl interface to the Internet Route Registry.  The interface uses the RIPE/RPSL Tool Query Language as defined in Appendix B of the IRRd User Guide.  The guide can be found at http://www.irrd.net/, however an understanding of the query language is not required to use this module.  
+
+Net::IRR supports IRRd's multiple-command mode.  Multiple-command mode is good for intensive queries since only one TCP connection needs to be made for multiple queries.  The interface also allows for additional queries that aren't supported by standard UNIX I<whois> utitilies.  
+
+Hopefully this module will stimulate development of new Route Registry tools written in Perl.  An example of Route Registry tools can be found by googling for RAToolset which is now known as the IRRToolset.  The RAToolset was originally developed by ISI, http://www.isi.edu/, and is now maintained by RIPE, http://www.ripe.net/.
 
 =head1 METHODS
 
@@ -240,7 +248,7 @@ This method provides database syncronization information.  This makes it possibl
 
 =item $whois->get_as_set("AS-ELI", 1)
 
-This method takes an AS-SET object name and returns the ASNs registered for the AS-SET object.  The method takes and optional second argument which enables AS-SET key expasion since an AS-SET can contain both ASNs and AS-SET keys.  undef is returned upon failure.
+This method takes an AS-SET object name and returns the ASNs registered for the AS-SET object.  The method takes an optional second argument which enables AS-SET key expasion since an AS-SET can contain both ASNs and AS-SET keys.  undef is returned upon failure.
 
 =item $whois->match('aut-num', 'AS5650'); - get RPSL objects registered in the database
 
