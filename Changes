@@ -1,5 +1,9 @@
 Revision history for Perl extension Net::IRR.
 
+0.04
+  - added $whois->get_route_set() (suggested by Peter Mills)
+  - fixed a usage message in $whois->get_as_set()
+
 0.03  Wed Jul 21 09:37:58 2004
   - more documentation cleanup
   - better error handling for parsing server responses (bug reported by Peter Mills)

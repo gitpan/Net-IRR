@@ -1,4 +1,5 @@
 package Net::IRR;
+# $Id: IRR.pm,v 1.9 2004/08/09 16:38:54 tcaine Exp $ 
 
 use strict;
 use warnings;
@@ -8,7 +9,7 @@ use Net::TCP;
 
 use vars qw/ @ISA %EXPORT_TAGS @EXPORT_OK $VERSION /;
 
-$VERSION = '0.03';
+$VERSION = '0.04';
 
 #  used for route searches
 use constant EXACT_MATCH   => 'o';
@@ -69,9 +70,10 @@ sub get_sync_info {
     return $self->_response();
 }
 
+*get_route_set = \&get_as_set;
 sub get_as_set {
     my ($self, $as_set, $expand) = @_;
-    croak("usage: $\whois->get_as_set( \$as_set )") unless @_ >= 2 && @_ <= 3;
+    croak("usage: \$whois->get_as_set( \$as_set )") unless @_ >= 2 && @_ <= 3;
     $expand = ($expand) ? ',1' : '';
     $self->{tcp}->send("!i${as_set}${expand}\n");
     if (my $data = $self->_response()) {
@@ -249,6 +251,10 @@ This method provides database syncronization information.  This makes it possibl
 =item $whois->get_as_set("AS-ELI", 1)
 
 This method takes an AS-SET object name and returns the ASNs registered for the AS-SET object.  The method takes an optional second argument which enables AS-SET key expasion since an AS-SET can contain both ASNs and AS-SET keys.  undef is returned upon failure.
+
+=item $whois->get_route_set("ROUTES-ELI", 1)
+
+This method takes an ROUTE-SET object name and returns the ROUTEs registered for the ROUTE-SET object.  The method takes an optional second argument which enables ROUTE-SET key expasion since a ROUTE-SET can contain both ROUTEs and ROUTE-SET keys.  undef is returned upon failure.
 
 =item $whois->match('aut-num', 'AS5650'); - get RPSL objects registered in the database
 
