@@ -1,5 +1,10 @@
 Revision history for Perl extension Net::IRR.
 
+0.06 Tue Aug 10 15:20:54 2004
+  - $whois->sources() now uses wantarray to return a scalar or list
+  - fixed a couple of typos in t/01_methods.t (reported by Joshua Keroes)
+  - the synopsis compiles now
+
 0.05 Tue Aug 10 08:07:10 2004
   - seperated $whois->get_route_search() from $whois->get_as_search()
   - cleaned up warnings

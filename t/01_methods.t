@@ -39,7 +39,7 @@ my $origin1 = $i->route_search("10.0.0.0/8", 'o');
 ok( not(defined($i->error())), "10.0.0.0/8 was not found" );
 
 my $info = $i->get_sync_info();
-ok($info, 'found syncronization information');
+ok($info, 'found synchronization information');
 
-ok($i->disconnect(), 'diconnect was successful');
+ok($i->disconnect(), 'disconnect was successful');
 

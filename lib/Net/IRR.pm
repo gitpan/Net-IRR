@@ -1,5 +1,5 @@
 package Net::IRR;
-# $Id: IRR.pm,v 1.10 2004/08/10 15:14:00 tcaine Exp $ 
+# $Id: IRR.pm,v 1.12 2004/08/11 17:19:35 tcaine Exp $ 
 
 use strict;
 use warnings;
@@ -9,7 +9,7 @@ use Net::TCP;
 
 use vars qw/ @ISA %EXPORT_TAGS @EXPORT_OK $VERSION /;
 
-$VERSION = '0.05';
+$VERSION = '0.06';
 
 #  used for route searches
 use constant EXACT_MATCH   => 'o';
@@ -47,7 +47,7 @@ sub get_routes_by_origin {
     $as = 'as'.$as unless $as =~ /^as/i;
     $self->{tcp}->send("!g${as}\n");
     if (my $data = $self->_response()) {
-        return (wantarray) ? split(" ", $data) : $data;
+        return wantarray ? split(" ", $data) : $data;
     }
     return ();
 }
@@ -58,7 +58,7 @@ sub get_routes_by_community {
     croak 'usage: $whois->get_routes_by_community( $community )' unless @_ == 2;
     $self->{tcp}->send("!h${community}\n");
     if (my $data = $self->_response()) {
-        return (wantarray) ? split(" ", $data) : $data;
+        return wantarray ? split(" ", $data) : $data;
     }
     return ();
 }
@@ -76,7 +76,7 @@ sub get_as_set {
     $expand = ($expand) ? ',1' : '';
     $self->{tcp}->send("!i${as_set}${expand}\n");
     if (my $data = $self->_response()) {
-        return (wantarray) ? split(" ", $data) : $data;
+        return wantarray ? split(" ", $data) : $data;
     }
     return ();
 }
@@ -86,7 +86,7 @@ sub get_route_set {    my ($self, $route_set, $expand) = @_;
     $expand = ($expand) ? ',1' : '';
     $self->{tcp}->send("!i${route_set}${expand}\n");
     if (my $data = $self->_response()) {
-        return (wantarray) ? split(" ", $data) : $data;
+        return wantarray ? split(" ", $data) : $data;
     }
     return ();
 }
@@ -137,7 +137,9 @@ sub sources {
     my ($self, @sources) = @_;
     my $source = (@sources) ? join(",", @sources) : '-lc';
     $self->{tcp}->send("!s${source}\n");
-    return $self->_response();
+    my $response = $self->_response();
+    chomp($response) if $response;
+    return wantarray ? split(',', $response) : $response;
 }
 
 sub update {
@@ -194,22 +196,22 @@ Net::IRR - Perl interface to the Internet Route Registry Daemon
       or die "can't connect to $host\n";
 
   my $version = $i->get_irrd_version();
-  print "IRRd Version: $version\n" unless $i->error();
+  print "IRRd version: $version\n" unless $i->error();
 
-  print "Routes by Origin AS5650\n";
+  print "routes by origin AS5650\n";
   my @routes = $i->get_routes_by_origin("AS5650");
-  print "found $#routes routes\n";
+  print "found " . scalar(@routes) . " routes\n";
 
   print "AS-SET for AS5650\n";
   if (my @ases = $i->get_as_set("AS-ELI", 1)) {
-      print "found $#ases AS's\n";
+      print "found " . scalar(@ases) . " AS's\n";
       print "@ases\n";
   }
   else {
       print "none found\n";
   }
 
-  my $aut-num = $i->match("aut-num","as5650");
+  my $aut_num = $i->match("aut-num","as5650")
       or warn("can't find object: " . $i->error . "\n");
 
   print $i->route_search("208.186.0.0/15", Net::IRR::EXACT_MATCH) 
