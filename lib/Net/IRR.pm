@@ -1,5 +1,4 @@
 package Net::IRR;
-# $Id: IRR.pm,v 1.12 2004/08/11 17:19:35 tcaine Exp $ 
 
 use strict;
 use warnings;
@@ -9,7 +8,7 @@ use Net::TCP;
 
 use vars qw/ @ISA %EXPORT_TAGS @EXPORT_OK $VERSION /;
 
-$VERSION = '0.06';
+$VERSION = '0.07';
 
 #  used for route searches
 use constant EXACT_MATCH   => 'o';
@@ -33,7 +32,8 @@ sub connect {
     $self->{port} = $args{port} || 43;
     eval {
         local $SIG{__WARN__} = sub { $self->{errstr} = shift };
-        $self->{tcp} = Net::TCP->new($self->{host}, $self->{port});
+        $self->{tcp} = Net::TCP->new($self->{host}, $self->{port})
+             or warn "cannot create Net::TCP object: $!";
     };
     return undef if $self->error();
     $self->_multi_mode();
@@ -43,7 +43,8 @@ sub connect {
 
 sub get_routes_by_origin {
     my ($self, $as) = @_;
-    croak 'usage: $whois->get_routes_by_origin( $as_number )' unless @_ == 2;
+    croak 'usage: $whois->get_routes_by_origin( $as_number )' 
+        unless @_ == 2;
     $as = 'as'.$as unless $as =~ /^as/i;
     $self->{tcp}->send("!g${as}\n");
     if (my $data = $self->_response()) {
@@ -55,8 +56,21 @@ sub get_routes_by_origin {
 # RIPE-181 Only
 sub get_routes_by_community {
     my ($self, $community) = @_;
-    croak 'usage: $whois->get_routes_by_community( $community )' unless @_ == 2;
+    croak 'usage: $whois->get_routes_by_community( $community )' 
+        unless @_ == 2;
     $self->{tcp}->send("!h${community}\n");
+    if (my $data = $self->_response()) {
+        return wantarray ? split(" ", $data) : $data;
+    }
+    return ();
+}
+
+sub get_ipv6_routes_by_origin {
+    my ($self, $as) = @_;
+    croak 'usage: $whois->get_ipv6_routes_by_origin( $as_number )' 
+        unless @_ == 2;
+    $as = 'as'.$as unless $as =~ /^as/i;
+    $self->{tcp}->send("!6${as}\n");
     if (my $data = $self->_response()) {
         return wantarray ? split(" ", $data) : $data;
     }
@@ -72,7 +86,8 @@ sub get_sync_info {
 
 sub get_as_set {
     my ($self, $as_set, $expand) = @_;
-    croak 'usage: $whois->get_as_set( $as_set )' unless @_ >= 2 && @_ <= 3;
+    croak 'usage: $whois->get_as_set( $as_set )' 
+        unless @_ >= 2 && @_ <= 3;
     $expand = ($expand) ? ',1' : '';
     $self->{tcp}->send("!i${as_set}${expand}\n");
     if (my $data = $self->_response()) {
@@ -82,7 +97,8 @@ sub get_as_set {
 }
 
 sub get_route_set {    my ($self, $route_set, $expand) = @_;
-    croak 'usage: $whois->get_route_set( $route_set )' unless @_ >= 2 && @_ <= 3;
+    croak 'usage: $whois->get_route_set( $route_set )' 
+        unless @_ >= 2 && @_ <= 3;
     $expand = ($expand) ? ',1' : '';
     $self->{tcp}->send("!i${route_set}${expand}\n");
     if (my $data = $self->_response()) {
@@ -93,7 +109,8 @@ sub get_route_set {    my ($self, $route_set, $expand) = @_;
 
 sub match {
     my ($self, $type, $key) = @_;
-    croak 'usage: $whois->match( $object_type, $key )' unless @_ == 3;
+    croak 'usage: $whois->match( $object_type, $key )' 
+        unless @_ == 3;
     $self->{tcp}->send("!m${type},${key}\n");
     return $self->_response();
 }
@@ -124,7 +141,8 @@ sub get_irrd_version {
 
 sub route_search {
     my ($self, $route, $specific) = @_;
-    croak 'usage: $whois->route_search( $route )' unless @_ >= 2 && @_ <= 3;
+    croak 'usage: $whois->route_search( $route )' 
+        unless @_ >= 2 && @_ <= 3;
     $specific = ($specific) ? ",$specific" : '';
     $self->{tcp}->send("!r${route}${specific}\n");
     my $response = $self->_response();
@@ -144,7 +162,8 @@ sub sources {
 
 sub update {
     my ($self, $db, $action, $object) = @_;
-    croak 'usage: $whois->update( $db, "ADD|DEL", $object )' unless @_ == 4;
+    croak 'usage: $whois->update( $db, "ADD|DEL", $object )' 
+        unless @_ == 4;
     croak 'second argument to $whois->update() must be either ADD or DEL'
         unless $action eq 'ADD' || $action eq 'DEL';
     $self->{tcp}->send( sprintf("!us%s\n%s\n\n%s\n\n!ue\n", $db, $action, $object) );
@@ -166,7 +185,7 @@ sub _response {
     while($data_length != length($data)) {
         $data .= $t->getline();
     }
-    warn sprintf("%s: only received %d out of %d bytes from %s:%d\n", $error_prefix, length($data), $data_length, $self->{host}, $self->{port})
+    carp sprintf("%s: only received %d out of %d bytes from %s:%d\n", $error_prefix, length($data), $data_length, $self->{host}, $self->{port})
         if $data_length != length($data);
     my $footer = $t->getline();
     return $data;
@@ -247,23 +266,27 @@ Same as $whois->disconnect().
 
 =item $whois->get_routes_by_origin('AS5650')
 
-Get routes with a specified origin AS.  This method takes an autonomous system number and returns the set of routes it originates.  Upon success this method returns a list of routes in list context or a string of space seperated routes.  undef is returned upon failure.
+Get routes with a specified origin AS.  This method takes an autonomous system number and returns the set of routes it originates.  Upon success this method returns a list of routes in list context or a string of space separated routes. undef is returned upon failure.
+
+=item $whois->get_ipv6_routes_by_origin('AS5650')
+
+Same as $whois->get_routes_by_origin(), but returns IPv6 instead of IPv4 routes.
 
 =item $whois->get_routes_by_community($community_name)
 
-This method is for RIPE-181 only.  It is not supported by RPSL.  This method takes a community object name  and returns the set of routes it originates.  Upon success this method returns a list of routes in list context or a string of space seperated routes.  undef is returned upon failure.
+This method is for RIPE-181 only.  It is not supported by RPSL.  This method takes a community object name and returns the set of routes it originates.  Upon success this method returns a list of routes in list context or a string of space separated routes.  undef is returned upon failure.
 
 =item $whois->get_sync_info()
 
-This method provides database syncronization information.  This makes it possible to view the mirror status of a database.  This method optionally takes the name of a database such as RADB or ELI.  If no argument is given the method will return information about all databases originating from and mirrored by the registry server.  If the optional argument is given the database specified will be checked and it's status returned.  This method returns undef if no database exists or if access is denied.
+This method provides database synchronization information.  This makes it possible to view the mirror status of a database.  This method optionally takes the name of a database such as RADB.  If no argument is given the method will return information about all databases originating from and mirrored by the registry server.  If the optional argument is given the database specified will be checked and it's status returned.  This method returns undef if no database exists or if access is denied.
 
 =item $whois->get_as_set("AS-ELI", 1)
 
-This method takes an AS-SET object name and returns the ASNs registered for the AS-SET object.  The method takes an optional second argument which enables AS-SET key expasion since an AS-SET can contain both ASNs and AS-SET keys.  undef is returned upon failure.
+This method takes an AS-SET object name and returns the ASNs registered for the AS-SET object.  The method takes an optional second argument which enables AS-SET key expansion since an AS-SET can contain both ASNs and AS-SET keys.  undef is returned upon failure.
 
 =item $whois->get_route_set("ROUTES-ELI", 1)
 
-This method takes an ROUTE-SET object name and returns the ROUTEs registered for the ROUTE-SET object.  The method takes an optional second argument which enables ROUTE-SET key expasion since a ROUTE-SET can contain both ROUTEs and ROUTE-SET keys.  undef is returned upon failure.
+This method takes an ROUTE-SET object name and returns the ROUTEs registered for the ROUTE-SET object.  The method takes an optional second argument which enables ROUTE-SET key expansion since a ROUTE-SET can contain both ROUTEs and ROUTE-SET keys.  undef is returned upon failure.
 
 =item $whois->match('aut-num', 'AS5650'); - get RPSL objects registered in the database
 
@@ -287,7 +310,7 @@ This method is used to both get and set the databases used for Internet Route Re
 
 =item $whois->update($database, 'ADD', $rpsl_rr_object)
 
-This method is used to add or delete a database object.  This method takes three arguments.   The first argument is the database to update.  The second arguemnt is the action which can be either "ADD" or "DEL".  The third and final required arguement is a route object in RPSL format.
+This method is used to add or delete a database object.  This method takes three arguments.  The first argument is the database to update.  The second argument is the action which can be either "ADD" or "DEL".  The third and final required argument is a route object in RPSL format.
 
 =item $whois->error()
 
@@ -297,7 +320,13 @@ Most Net::IRR methods set an error message when errors occur.  These errors can 
 
 =head1 AUTHOR
 
-Todd Caine  <tcaine@eli.net>
+Todd Caine  <todd.caine@gmail.com>
+
+=head1 CONTRIBUTORS
+
+Greg Skinner 
+  - Added $whois->get_ipv6_routes_by_origin() [RT #48316]
+  - Fixed connect bug [RT #51154]
 
 =head1 SEE ALSO
 
@@ -311,7 +340,6 @@ http://www.irrd.net/irrd-user.pdf, Appendix B
 
 =head1 COPYRIGHT
 
-Copyright 2002, 2003, 2004 by Todd Caine.  All rights reserved.  This program is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
-
+Copyright 2002-2010 by Todd Caine.  All rights reserved.  This program is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
 
 =cut
